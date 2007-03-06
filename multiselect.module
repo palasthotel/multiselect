@@ -1,0 +1,197 @@
+<?php
+// $Id $
+
+/**
+ * @file
+ * Allows users to select multiple items in an easier way than the normal node-reference widget
+ *
+ * @author Obslogic (Mike Smith aka Lionfish)
+ */
+
+
+
+/**
+ * Implementation of hook_help
+ */
+
+function multiselect_help($section='') 
+{
+  $output = '';
+  switch ($section)
+  {
+    case "admin/help#multiselect":
+      $output = '<p>'.t("Provides an easy to use control for adding multiple items.").'</p>';
+      break;
+  }
+  return $output;
+}
+
+/**
+ * Implementation of hook_perm
+ * @todo Need to check permissions make sense
+ */
+
+function multiselect_perm()
+{
+  return array('access multiselect_module'); //?
+}
+
+/**
+ * Implementation of hook_widget_info.
+ * Specifies the label and that it is a widget for the nodereference field type
+ */
+
+function multiselect_widget_info()
+{
+  return array(
+    'multiselect_select' => array(
+      'label' => 'Multiselect List',
+      'field types' => array('nodereference'),
+    ),
+  );
+}
+
+/**
+ * Implementation of hook_widget
+ * @todo Temporary 'print_r's need removing
+ * @todo Is the if ($field['widget']['type'] == 'multiselect_select' necessary?
+ * @todo Doesn't seem to populate list when in 'preview'
+ */
+
+function multiselect_widget($op, &$node, $field, &$node_field)
+{
+  print_r("op = $op. field['widget']['type'] = ".$field['widget']['type']."<br/>\n");
+
+     //necessary to get list of nodes that can be included in this nodereference
+  include_once(drupal_get_path('module', 'content').'/nodereference.module');
+     
+  if ($field['widget']['type'] == 'multiselect_select')
+  {
+    switch ($op) {
+      case 'prepare form values':
+           //puts node_field (original) values into a temporary bit of the array called default nids
+        $node_field_transposed = content_transpose_array_rows_cols($node_field);
+        $node_field['default nids'] = $node_field_transposed['nid'];
+        break;
+      case 'form':
+           //generates form object
+        $form = array();
+        $selectedoptions = array();
+        $notselectedoptions = array();
+
+           //gets list of all nodes we can reference
+        $options = _nodereference_potential_references($field, true);
+
+           //for each node, check if it's already selected. If it is, add it to the selected list
+        foreach ($options as $key => $value) {
+          $inarray = FALSE;
+          if (is_array($node_field['default nids']))
+          {
+            foreach($node_field['default nids'] as $n => $nid)
+            {
+              if ($nid == $key)
+              {
+                $inarray = TRUE;
+              }
+            }
+          }
+          if ($inarray)
+          {          
+            $selectedoptions[$key] = _nodereference_item($field, $value);
+          }
+          else
+          {
+            $notselectedoptions[$key] = _nodereference_item($field, $value);
+          }
+        }
+
+          //useful variables
+        $fieldname=$field['field_name'];
+        $addbutton=$fieldname."_add";
+        $removebutton=$fieldname."_remove";
+        $selfield=$fieldname."_sel";
+        $unselfield=$fieldname."_unsel";
+        
+          //call methods to create prefix (ie the non-selected table, etc)
+        $prefix = "<div class='container-inline'>";
+        $prefix.= _html_for_notselected_box($notselectedoptions, $unselfield, $fieldname);
+        $prefix.= _html_for_buttons($fieldname);
+
+          //create the form item
+        $form[$fieldname] = array('#tree' => TRUE);
+        $form[$fieldname]['nids'] = array(
+          '#type' => 'select',
+          '#options' => $selectedoptions,
+          '#size' => 10,
+          '#prefix' => $prefix,
+          '#suffix' => "\n</div>\n",
+          '#multiple' => TRUE,
+          '#attributes' => array('class' => "$selfield multiselect_sel", 'id' => $fieldname),
+          '#default_value' => $node_field['default nids'],
+        );
+
+          //return the form array
+        return $form;
+      case 'process form values':
+          //Replace the node values
+        $node_field = content_transpose_array_rows_cols(array('nid' => $node_field['nids']));
+        break;
+      case 'submit':
+        break;
+    }
+  }
+}
+
+/**
+ * Provides html to display the buttons on the form
+ * @todo could I do this by putting items in the form array? (or would that be too complicated?)
+ */
+
+function _html_for_buttons($fieldname)
+{
+  $addremovebuttons = "<span class='multiselect_add' id='$fieldname'>\n<img align='top' ";
+  $addremovebuttons.= "src='../../../sites/all/modules/multiselect/images/add.png' ";
+  $addremovebuttons.= "alt='add selection'>\n</span>";
+  $addremovebuttons.= "<span class='multiselect_remove' id='$fieldname'>\n<img align='bottom' ";
+  $addremovebuttons.= "src='../../../sites/all/modules/multiselect/images/remove.png' ";
+  $addremovebuttons.= "alt='add selection'>\n</span>";
+  return $addremovebuttons;
+}
+
+/**
+ * Provides html to draw the not selected box
+ */
+
+function _html_for_notselected_box($notselectedoptions, $unselfield, $fieldname)
+{
+  $boxhtml = '<div class="form-item">';
+  $boxhtml.= "<select name='$unselfield' multiple='multiple' ";
+  $boxhtml.=  "class='form-select $unselfield multiselect_unsel' ";
+  $boxhtml.=  "id='$fieldname' size='10'>\n";
+
+  foreach($notselectedoptions as $value => $name)
+  {
+    $boxhtml.="<option value='$value'>$name</option>";
+  }
+
+  $boxhtml.= "</select>\n";
+  $boxhtml.= "</div>\n";
+  return $boxhtml;
+}
+
+/**
+ * Implementation of hook_nodeapi.
+ * @todo The adding of javascript can be moved to the _widget function.
+ */
+
+function multiselect_nodeapi(&$node, $op, $teaser, $page)
+{
+  switch ($op)
+  {
+    case 'prepare': 
+      $path = drupal_get_path('module','multiselect');
+      drupal_add_js($path . '/multiselect.js');
+  }
+}
+
+?>
