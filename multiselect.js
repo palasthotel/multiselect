@@ -71,6 +71,7 @@ jQuery.fn.moveSelectionTo = function()
       if (option.selected)
       {
         dest.addOption(option);
+        this.remove(i);
       }
     }
   });
@@ -84,6 +85,10 @@ jQuery.fn.addOption = function()
   option = arguments[0];
   this.each(function()
   {
-    this.options[this.options.length] = option;
+    //had to alter code to this to make it work in IE
+    anOption = document.createElement('option');
+    anOption.text = option.text;
+    anOption.value = option.value;
+    this.options[this.options.length] = anOption;
   });
 }
