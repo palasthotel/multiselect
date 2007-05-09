@@ -6,6 +6,14 @@
 
 $(document).ready(function()
 {
+  //remove the items that haven't been selected from the select box.
+  $('select.multiselect_unsel').each(function()
+  {
+    unselclass = '.' + this.id + '_unsel';
+    selclass = '.' + this.id + '_sel';
+    $(unselclass).removeContentsFrom($(selclass));   
+  });
+
   //note: Doesn't matter what sort of submit button it is really (preview or submit)
   //selects all the items in the selected box (so they are actually selected) when submitted
   $('input.form-submit').click(function()
@@ -57,6 +65,22 @@ jQuery.fn.selectAll = function()
   });
 }
 
+//removes the content of this select box from the target
+//usage $('nameofselectbox').removeContentsFrom(target_selectbox)
+//
+jQuery.fn.removeContentsFrom = function()
+{
+  dest = arguments[0];
+  this.each(function()
+  {
+    for (var i=this.options.length-1;i>=0;i--)
+    {
+      dest.removeOption(this.options[i].value);
+    }
+  });
+}
+
+
 //moves the selection to the select box specified
 //usage $('nameofselectbox').moveSelectionTo(destination_selectbox)
 //
@@ -90,5 +114,27 @@ jQuery.fn.addOption = function()
     anOption.text = option.text;
     anOption.value = option.value;
     this.options[this.options.length] = anOption;
+    return false;
   });
 }
+
+//Removes an option from a select box
+//usage $('nameofselectbox').removeOption(valueOfOptionToRemove);
+//
+jQuery.fn.removeOption = function()
+{
+  targOption = arguments[0];
+
+  this.each(function()
+  {
+    for (var i=this.options.length-1;i>=0;i--)
+    {
+      option = this.options[i];
+      if (option.value==targOption)
+      {
+        this.remove(i);
+      }
+    }
+  });
+}
+

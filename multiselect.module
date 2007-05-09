@@ -73,6 +73,7 @@ function multiselect_widget($op, &$node, $field, &$node_field)
            //generates form object
         $form = array();
 
+        $alloptions = array();
         $selectedoptions = array();
         $notselectedoptions = array();
 
@@ -131,7 +132,8 @@ function multiselect_widget($op, &$node, $field, &$node_field)
           else
           {
             $notselectedoptions[$key] = _nodereference_item($field, $value);
-          }          
+          }
+          $alloptions[$key] = _nodereference_item($field, $value);
         }
 
 
@@ -144,28 +146,34 @@ function multiselect_widget($op, &$node, $field, &$node_field)
         $unselfield=$fieldname."_unsel";
         
           //call methods to create prefix (ie the non-selected table, etc)
-        $prefix = '';
-        $prefix.= '<div class="form-item"><label for="edit-title">';
-        $prefix.= ''.t($field['widget']['label']).':';
+        $prefix_pre = '';
+        $prefix_pre.= '<div class="form-item"><label for="edit-title">';
+        $prefix_pre.= ''.t($field['widget']['label']).':';
         if ($field['required']) {
-          $prefix.= '<span class="form-required" title="'.t('This field is required.').'"> * </span>';
+          $prefix_pre.= '<span class="form-required" title="'.t('This field is required.').'"> * </span>';
         }
-        $prefix.= "</label>";
-        $prefix.= "\n<div class='container-inline'>";
-        $prefix.= _html_for_notselected_box($notselectedoptions, $unselfield, $fieldname);
-        $prefix.= _html_for_buttons($fieldname);
+        $prefix_pre.= "</label>";
+        $prefix_pre.= "\n<div class='container-inline'>";
+        $prefix_pre.= _multiselect_html_for_notselected_box_start($unselfield, $fieldname);
+        $prefix_options = _multiselect_html_for_notselected_box_options($notselectedoptions);
+        $prefix_post = _multiselect_html_for_notselected_box_end();
+        $prefix_post.= _html_for_buttons($fieldname);
 
           //create the form item
         $form[$fieldname] = array('#tree' => TRUE);
         $form[$fieldname]['nids'] = array(
           '#type' => 'select',
-          '#options' => $selectedoptions,
+          '#options' => $alloptions, //$selectedoptions,
           '#size' => 10,
-          '#prefix' => $prefix,
+          '#prefix' => $prefix_pre.$prefix_options.$prefix_post,
           '#suffix' => "\n</div></div>\n",
           '#multiple' => TRUE,
           '#attributes' => array('class' => "$selfield multiselect_sel", 'id' => $fieldname),
           '#default_value' => $node_field['default nids'],
+          '#after_build' => array('multiselect_fix_preview'),
+          '#all_options' => $alloptions, //list of all options (used by the #after_build function)
+          '#prefix_pre' => $prefix_pre,
+          '#prefix_post' => $prefix_post,
         );
           //return the form array
         return $form;
@@ -196,6 +204,64 @@ function multiselect_widget($op, &$node, $field, &$node_field)
 }
 
 /**
+ * Alters the preview form to include the newly added items
+ */
+function multiselect_fix_preview($form, $edit)
+{
+/*  print_r("\n\nFORM:\n");
+  print_r($form);
+  print_r("\n\nEDIT:\n");
+  print_r($edit);
+  print_r("\n\nPOST:\n");
+  print_r($_POST);*/
+  
+  $source_array = $_POST;
+  foreach ($form['#parents'] as $key)
+  {
+    $source_array = $source_array[$key];
+  }
+  $field = $form['#parents'][0];
+  $options = $form['#all_options'];
+
+  $selectedoptions = array();
+
+  if (is_array($source_array))
+  {
+    $form['#prefix'] = "";
+    $form['#prefix'].= $form['#prefix_pre'];    
+    foreach ($options as $key => $value)
+    {
+      $inarray = FALSE;
+      foreach ($source_array as $x => $nid)
+      {
+        if ($key == $nid)
+        {
+          $inarray = TRUE;
+        }
+      }
+
+      if ($inarray)
+      {
+           //selected
+        $selectedoptions[$key] = $value;
+      }
+      else
+      {
+           //unselected
+        $form['#prefix'].= "<option value='".$key."'>".$value."</options>";
+      }
+    }
+
+    $form['#prefix'].= $form['#prefix_post'];
+
+    $form['#options'] = $options;
+  }
+  return $form;
+}
+
+
+
+/**
  * Provides html to display the buttons on the form
  * @todo could I do this by putting items in the form array? (or would that be too complicated?)
  */
@@ -218,18 +284,29 @@ function _html_for_buttons($fieldname)
  * Provides html to draw the not selected box
  */
 
-function _html_for_notselected_box($notselectedoptions, $unselfield, $fieldname)
+function _multiselect_html_for_notselected_box_start($unselfield, $fieldname)
 {
-  $boxhtml = '<div class="form-item">';
+  $boxhtml = '';
+  $boxhtml.= '<div class="form-item">';
   $boxhtml.= "<select name='$unselfield' multiple='multiple' ";
   $boxhtml.=  "class='form-select $unselfield multiselect_unsel' ";
   $boxhtml.=  "id='$fieldname' size='10'>\n";
+  return $boxhtml;
+}
 
+function _multiselect_html_for_notselected_box_options($notselectedoptions)
+{
+  $boxhtml = '';
   foreach($notselectedoptions as $value => $name)
   {
-    $boxhtml.="<option value='$value'>$name</option>";
+    $boxhtml.="<option value='$value'>$name</option>\n";
   }
+  return $boxhtml;
+}
 
+function _multiselect_html_for_notselected_box_end()
+{
+  $boxhtml = '';
   $boxhtml.= "</select>\n";
   $boxhtml.= "</div>\n";
   return $boxhtml;
