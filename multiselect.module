@@ -68,7 +68,9 @@ function multiselect_widget($op, &$node, $field, &$node_field)
            //puts node_field (original) values into a temporary bit of the array called default nids
         $node_field_transposed = content_transpose_array_rows_cols($node_field);
         $node_field['default nids'] = $node_field_transposed['nid'];
-        break;
+        
+      break;
+        
       case 'form': 
            //generates form object
         $form = array();
@@ -111,32 +113,29 @@ function multiselect_widget($op, &$node, $field, &$node_field)
           //insert CSS (based on http://www.lullabot.com/articles/how_to_properly_add_css_files)
           //but http://drupal.org/node/60096 says to use theme_add_style, but this fn doesn't exist, so using...
         drupal_add_css($path . '/multiselect.css','module','all',FALSE); //doesn't aggregate: as it's not used much(?)
-
-           //for each node, check if it's already selected. If it is, add it to the selected list
-        foreach ($options as $key => $value) {
-          $inarray = FALSE;
-          if (is_array($node_field['default nids']))
+        
+        //add each node to the alloptions array
+        foreach ($options as $key => $node_ref) {
+          $alloptions[$key] = $node_ref->node_title;
+        }        
+        
+        //If there already exists referenced nodes for this field, add them
+        // to the selected options array (by order of their delta)
+        if (is_array($node_field['default nids']))
+        {
+          foreach($node_field['default nids'] as $delta => $nid)
           {
-            foreach($node_field['default nids'] as $n => $nid)
-            {
-              if ($nid == $key)
-              {
-                $inarray = TRUE;
-              }
-            }
+            $selectedoptions[$nid] = $options[$nid]->node_title;
           }
-          if ($inarray)
-          {          
-            $selectedoptions[$key] = _nodereference_item($field, $value);
-          }
-          else
-          {
-            $notselectedoptions[$key] = _nodereference_item($field, $value);
-          }
-          $alloptions[$key] = _nodereference_item($field, $value);
         }
-
-
+        
+        //anything in $alloptions but not in $selectedoptions is "not selected"
+        $notselectedoptions = array_diff($alloptions,$selectedoptions);
+        
+        //reassign alloptions to reflect order. No new options are created in this list,
+        //but putting selected options first ensures the form is populated in
+        //the order of (thus maintaining) its deltas.
+        $alloptions = $selectedoptions + $notselectedoptions;
 
           //useful variables
         $fieldname=$field['field_name'];
@@ -182,6 +181,11 @@ function multiselect_widget($op, &$node, $field, &$node_field)
         if ($field['multiple'])
         {
           $node_field = content_transpose_array_rows_cols(array('nid' => $node_field['nids']));
+         
+          //node_field is indexed by nids, 
+          //but we want it by delta (the order of the indices)
+          $node_field = array_values($node_field);
+
         }
         else
         {
@@ -208,53 +212,34 @@ function multiselect_widget($op, &$node, $field, &$node_field)
  */
 function multiselect_fix_preview($form, $edit)
 {
-/*  print_r("\n\nFORM:\n");
-  print_r($form);
-  print_r("\n\nEDIT:\n");
-  print_r($edit);
-  print_r("\n\nPOST:\n");
-  print_r($_POST);*/
-  
+
   $source_array = $_POST;
   foreach ($form['#parents'] as $key)
   {
     $source_array = $source_array[$key];
   }
-  $field = $form['#parents'][0];
-  $options = $form['#all_options'];
-
-  $selectedoptions = array();
+  
+  $selected_options = array();
 
   if (is_array($source_array))
   {
     $form['#prefix'] = "";
     $form['#prefix'].= $form['#prefix_pre'];    
-    foreach ($options as $key => $value)
+    foreach ($source_array as $delta => $nid)
     {
-      $inarray = FALSE;
-      foreach ($source_array as $x => $nid)
-      {
-        if ($key == $nid)
-        {
-          $inarray = TRUE;
-        }
-      }
-
-      if ($inarray)
-      {
-           //selected
-        $selectedoptions[$key] = $value;
-      }
-      else
-      {
-           //unselected
-        $form['#prefix'].= "<option value='".$key."'>".$value."</options>";
-      }
+      $inarray = TRUE;
+      $selected_options[$nid] = $form['#all_options'][$nid];
     }
-
+  
+    $unselected_options = array_diff($form['#all_options'],$selected_options);
+    foreach($unselected_options as $key => $value)
+    {
+      $form['#prefix'].= "<option value='".$key."'>".$value."</options>";
+    }
+    
     $form['#prefix'].= $form['#prefix_post'];
+    $form['#options'] = $selected_options;
 
-    $form['#options'] = $options;
   }
   return $form;
 }
