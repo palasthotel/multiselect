@@ -1,24 +1,39 @@
-select.multiselect_unsel
+fieldset.multiselect
 {
-  width: 20%;
+  width: 90%;
+  /*keeps the select boxes from dropping down when window is shrunk*/
+  min-width: 300px;
 }
 
-select.multiselect_sel
+fieldset.multiselect div 
 {
-  width:20%;
-  position:relative;
-  left:-50px;
+  float: left;
+  width: 40%;
 }
 
-span.multiselect_add
+fieldset.multiselect div select
 {
-  position:relative;
-  left:0px;
+  width: 100%;
 }
 
-span.multiselect_remove
+select.selected
 {
-  position:relative;
-  left:-50px;
+  width: 100%;
+}
+
+fieldset.multiselect span.select img
+{
+  display: block;
+  float: left;
+  margin-top: 50px;
+}
+
+
+fieldset.multiselect span.deselect img
+{
+  display: block;
+  float: left;
+  margin-top: 100px;
+  margin-left: -45px;
 }
 

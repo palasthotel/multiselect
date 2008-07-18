@@ -50,252 +50,177 @@ function multiselect_widget_info()
   );
 }
 
+
 /**
  * Implementation of hook_widget
- * @todo Is the if ($field['widget']['type'] == 'multiselect_select' necessary?
  * @todo Doesn't seem to populate list when in 'preview' (see http://drupal.org/node/139595)
  */
+function multiselect_widget($op, &$node, $field, &$items) {
+  switch ($op) {
+    case 'prepare form values':
+      $items_transposed = content_transpose_array_rows_cols($items);
+      $items['default nids'] = $items_transposed['nid'];
 
-function multiselect_widget($op, &$node, $field, &$node_field)
-{
-     //necessary to get list of nodes that can be included in this nodereference
-  include_once(drupal_get_path('module', 'content').'/nodereference.module');
-     
-  if ($field['widget']['type'] == 'multiselect_select')
-  {
-    switch ($op) {
-      case 'prepare form values':
-           //puts node_field (original) values into a temporary bit of the array called default nids
-        $node_field_transposed = content_transpose_array_rows_cols($node_field);
-        $node_field['default nids'] = $node_field_transposed['nid'];
-        
       break;
+
+    case 'form':
+      
+      $module_base_path = drupal_get_path('module','multiselect');
+      
+      //inserts javascript
+      drupal_add_js($module_base_path . '/multiselect.js');
         
-      case 'form': 
-           //generates form object
-        $form = array();
+      //insert CSS (based on http://www.lullabot.com/articles/how_to_properly_add_css_files)
+      //FALSE means it doesn't aggregate: as it's not used much
+      //TODO: good decision?
+      drupal_add_css($module_base_path . '/multiselect.css','module','all',FALSE); 
+      $form = array();
 
-        $alloptions = array();
-        $selectedoptions = array();
-        $notselectedoptions = array();
+      $options = _nodereference_potential_references($field, TRUE);
+      
+      foreach ($options as $key => $value) {
+        $options[$key] = _nodereference_item($field, $value, FALSE);
+      }
 
-           //gets list of all nodes we can reference
-        $options = _nodereference_potential_references($field, true);
-
-           //if we're only allowed to select a single item (multiple is disabled) generate a different widget
-        if (!$field['multiple'])
+      //If there already exists referenced nodes for this field, add them
+      // to the selected options array (by order of their delta)
+      if (is_array($items['default nids']))
+      {
+        foreach($items['default nids'] as $delta => $nid)
         {
-          $newoptions = array();
-          foreach ($options as $key => $value) {
-            $newoptions[$key] = _nodereference_item($field, $value);
-          }
-          if (!$field['required']) {
-            $newoptions = array(0 => t('<none>')) + $newoptions;
-          }
-
-          $form[$field['field_name']] = array('#tree' => TRUE);
-          $form[$field['field_name']]['nids'] = array(
-            '#type' => 'select',
-            '#title' => t($field['widget']['label']),
-            '#default_value' => $node_field['default nids'],            
-            '#multiple' => $field['multiple'],
-            '#size' =>  $field['multiple'] ? min(count($newoptions), 6) : 0,
-            '#options' => $newoptions,
-            '#required' => $field['required'],
-            '#description' => $field['widget']['description'],
-          );
-          return $form;
-        }//end of if single-item only
-
-          //inserts javascript
-        $path = drupal_get_path('module','multiselect');
-        drupal_add_js($path . '/multiselect.js');
-          //insert CSS (based on http://www.lullabot.com/articles/how_to_properly_add_css_files)
-          //but http://drupal.org/node/60096 says to use theme_add_style, but this fn doesn't exist, so using...
-        drupal_add_css($path . '/multiselect.css','module','all',FALSE); //doesn't aggregate: as it's not used much(?)
-        
-        //add each node to the alloptions array
-        foreach ($options as $key => $node_ref) {
-          $alloptions[$key] = $node_ref->node_title;
-        }        
-        
-        //If there already exists referenced nodes for this field, add them
-        // to the selected options array (by order of their delta)
-        if (is_array($node_field['default nids']))
-        {
-          foreach($node_field['default nids'] as $delta => $nid)
-          {
-            $selectedoptions[$nid] = $options[$nid]->node_title;
-          }
+          $selected_options[$nid] = $options[$nid];
         }
-        
-        //anything in $alloptions but not in $selectedoptions is "not selected"
-        $notselectedoptions = array_diff($alloptions,$selectedoptions);
-        
-        //reassign alloptions to reflect order. No new options are created in this list,
-        //but putting selected options first ensures the form is populated in
-        //the order of (thus maintaining) its deltas.
-        $alloptions = $selectedoptions + $notselectedoptions;
+      }
+      
+      //anything in $alloptions but not in $selectedoptions is "not selected"
+      $not_selected_options = array_diff($options,$selected_options);
 
-          //useful variables
-        $fieldname=$field['field_name'];
-        $addbutton=$fieldname."_add";
-        $removebutton=$fieldname."_remove";
-        $selfield=$fieldname."_sel";
-        $unselfield=$fieldname."_unsel";
+      //reassign $options to reflect delta. 
+      //note: No new options are created in this list,
+      //but putting selected options first ensures the form is populated in
+      //the order of (thus maintaining) its deltas.
+      $options = $selected_options + $not_selected_options;
+      
+         //create the containing form item
+      $form[$field['field_name']] = array(
+        '#type'=>'fieldset',
+        '#title'=>t($field['widget']['label']),
+        '#tree' => TRUE,
+        '#attributes' => array('class'=>'multiselect'),
+        '#all_options' => $options,
+        '#after_build' => array('multiselect_fix_selected'),
+      );
+      
+      //the list of items currently selected
+      $form[$field['field_name']]['selected'] = array(
+        '#title' => t("selected"),
+        '#attributes' => array('class' => "container-inline selected multiselect", 'id' => $field['field_name']),
+        '#type' => 'select',
+        '#weight' => 3,
+        '#options' => $selected_options,
+        '#size' => 10,
+        '#multiple' => TRUE,
+      );
+      
+      //the list of items currently not selected
+      $form[$field['field_name']]['unselected'] = array(
+        '#title' => t("unselected"),
+        '#attributes' => array('class' => "container-inline unselected multiselect", 'id' => $field['field_name']),
+        '#type' => 'select',
+        '#weight' => 0,
+        '#options' => $not_selected_options,
+        '#size' => 10,
+        '#multiple' => TRUE,
+      );
+      
+      /*
+      * The buttons to (de)select objects are implemented as field markup
+      * with an associated javascript function onclick
+      */
+      
+      //name attribute of the associated select elements
+      $selected_name = $field['field_name'].'[selected][]';
+      $unselected_name = $field['field_name'].'[unselected][]';
+      
+      $form[$field['field_name']]['select'] = array(
+        '#type' => 'markup',
+        '#submit'=> false,
+        '#value' => '<span class="select"><img  src="'.$module_base_path.'/images/add.png" '.
+          "onclick='moveSelectedOptions( \"$unselected_name\" , \"$selected_name\" )' /></span>",
+        '#weight' => 1,
+        '#attributes' => array('class' => 'select'),
+      );
+      
+      $form[$field['field_name']]['deselect'] = array(
+        '#type' => 'markup',
+        '#submit'=> false,
+        '#value' => '<span class="deselect"><img src="'.$module_base_path.'/images/remove.png"'.
+          "onclick='moveSelectedOptions( \"$selected_name\" , \"$unselected_name\" )' /></span>",
+        '#weight' => 2,
+      );
+      return $form;
+
+    case 'process form values':
+      if ($field['multiple']) {
+
+        //adjust perspective
+        $items['nids'] = $items['selected'];
+        unset($items['selected']);
+        unset($items['unselected']);
         
-          //call methods to create prefix (ie the non-selected table, etc)
-        $prefix_pre = '';
-        $prefix_pre.= '<div class="form-item"><label for="edit-title">';
-        $prefix_pre.= ''.t($field['widget']['label']).':';
-        if ($field['required']) {
-          $prefix_pre.= '<span class="form-required" title="'.t('This field is required.').'"> * </span>';
-        }
-        $prefix_pre.= "</label>";
-        $prefix_pre.= "\n<div class='container-inline'>";
-        $prefix_pre.= _multiselect_html_for_notselected_box_start($unselfield, $fieldname);
-        $prefix_options = _multiselect_html_for_notselected_box_options($notselectedoptions);
-        $prefix_post = _multiselect_html_for_notselected_box_end();
-        $prefix_post.= _html_for_buttons($fieldname);
-
-          //create the form item
-        $form[$fieldname] = array('#tree' => TRUE);
-        $form[$fieldname]['nids'] = array(
-          '#type' => 'select',
-          '#options' => $alloptions, //$selectedoptions,
-          '#size' => 10,
-          '#prefix' => $prefix_pre.$prefix_options.$prefix_post,
-          '#suffix' => "\n</div></div>\n",
-          '#multiple' => TRUE,
-          '#attributes' => array('class' => "$selfield multiselect_sel", 'id' => $fieldname),
-          '#default_value' => $node_field['default nids'],
-          '#after_build' => array('multiselect_fix_preview'),
-          '#all_options' => $alloptions, //list of all options (used by the #after_build function)
-          '#prefix_pre' => $prefix_pre,
-          '#prefix_post' => $prefix_post,
-        );
-          //return the form array
-        return $form;
-      case 'process form values':
-          //Replace the node values
-        if ($field['multiple'])
-        {
-          $node_field = content_transpose_array_rows_cols(array('nid' => $node_field['nids']));
-         
-          //node_field is indexed by nids, 
-          //but we want it by delta (the order of the indices)
-          $node_field = array_values($node_field);
-
-        }
-        else
-        {
-          $node_field[0]['nid'] = $node_field['nids'];
+        // if nothing selected, make it 'none'
+        if (empty($items['nids'])) {
+          $items['nids'] = array(0 => '0');
         }
 
-        unset($node_field['nids']);//removes widgets data representation, so it's not saved.
+        $items = array_values(content_transpose_array_rows_cols(array('nid' => $items['nids'])));
+      }
+      else {
+        $items[0]['nid'] = $items['nids'];
+      }
+      // Remove the widget's data representation so it isn't saved.
+      //  unset($items['nids']);
+      foreach ($items as $delta => $item) {
+        $items[$delta]['error_field'] =  $field['field_name'] .'][nids';
+      }
+      
+    case 'validate':
 
-            //(unknown purpose, but nodereference.module has this code so we should too...)
-        foreach($node_field as $delta => $item)
-        {
-          $node_field[$delta]['error_field'] =  $field['field_name'].'][nids';
-        }
-
-        break;
-      case 'submit':
-        break;
-    }
   }
+
 }
+
 
 /**
  * Alters the preview form to include the newly added items
  */
-function multiselect_fix_preview($form, $edit)
+function multiselect_fix_selected($field, $edit)
 {
-
-  $source_array = $_POST;
-  foreach ($form['#parents'] as $key)
-  {
-    $source_array = $source_array[$key];
-  }
   
-  $selected_options = array();
-
-  if (is_array($source_array))
-  {
-    $form['#prefix'] = "";
-    $form['#prefix'].= $form['#prefix_pre'];    
-    foreach ($source_array as $delta => $nid)
-    {
-      $inarray = TRUE;
-      $selected_options[$nid] = $form['#all_options'][$nid];
-    }
+  if( isset($field['#post']) && !empty($field['#post'])){
   
-    $unselected_options = array_diff($form['#all_options'],$selected_options);
-    foreach($unselected_options as $key => $value)
-    {
-      $form['#prefix'].= "<option value='".$key."'>".$value."</options>";
-    }
+    $field_id = $field['selected']['#attributes']['id'];
     
-    $form['#prefix'].= $form['#prefix_post'];
-    $form['#options'] = $selected_options;
-
+    
+    $selected = $field['selected']['#post'][$field_id]['selected'];
+    
+    $field['selected']['#options'] =  array();
+    $field['unselected']['#options'] =  $field['#all_options'];
+    
+    foreach( $selected as $selected_nid )
+    {
+      $field['selected']['#options'][$selected_nid] = $field['#all_options'][$selected_nid];
+      unset($field['unselected']['#options'][$selected_nid]);
+    }
   }
-  return $form;
+  
+  return $field;
 }
 
 
 
-/**
- * Provides html to display the buttons on the form
- * @todo could I do this by putting items in the form array? (or would that be too complicated?)
- */
 
-function _html_for_buttons($fieldname)
-{
-  $path = base_path(); 
-  $path.= drupal_get_path('module','multiselect');
-  $path.= "/images";
-  $addremovebuttons = "<span class='multiselect_add' id='$fieldname'>\n<img align='top' ";
-  $addremovebuttons.= "src='$path/add.png' ";
-  $addremovebuttons.= "alt='".t("add selection")."'>\n</span>";
-  $addremovebuttons.= "<span class='multiselect_remove' id='$fieldname'>\n<img align='bottom' ";
-  $addremovebuttons.= "src='$path/remove.png' ";
-  $addremovebuttons.= "alt='".t("remove selection")."'>\n</span>";
-  return $addremovebuttons;
-}
 
-/**
- * Provides html to draw the not selected box
- */
-
-function _multiselect_html_for_notselected_box_start($unselfield, $fieldname)
-{
-  $boxhtml = '';
-  $boxhtml.= '<div class="form-item">';
-  $boxhtml.= "<select name='$unselfield' multiple='multiple' ";
-  $boxhtml.=  "class='form-select $unselfield multiselect_unsel' ";
-  $boxhtml.=  "id='$fieldname' size='10'>\n";
-  return $boxhtml;
-}
-
-function _multiselect_html_for_notselected_box_options($notselectedoptions)
-{
-  $boxhtml = '';
-  foreach($notselectedoptions as $value => $name)
-  {
-    $boxhtml.="<option value='$value'>$name</option>\n";
-  }
-  return $boxhtml;
-}
-
-function _multiselect_html_for_notselected_box_end()
-{
-  $boxhtml = '';
-  $boxhtml.= "</select>\n";
-  $boxhtml.= "</div>\n";
-  return $boxhtml;
-}
 
 /**
  * Implementation of hook_nodeapi.
