@@ -2,7 +2,7 @@
 
 //@file
 //Code that operates multiselect boxes
-//@author Obslogic (Mike Smith aka Lionfish)
+
 $(document).ready(function()
  {
   //note: Doesn't matter what sort of submit button it is really (preview or submit)
@@ -11,6 +11,7 @@ $(document).ready(function()
   {
     $('fieldset.multiselect select[@name$="[selected][]"]').selectAll();
   });
+
 });
 
 //selects all the items in the select box it is called from.

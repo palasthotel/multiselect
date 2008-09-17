@@ -26,16 +26,6 @@ function multiselect_help($section='')
 }
 
 /**
- * Implementation of hook_perm
- * @todo Need to check permissions make sense
- */
-
-function multiselect_perm()
-{
-  return array('access multiselect_module'); //?
-}
-
-/**
  * Implementation of hook_widget_info.
  * Specifies the label and that it is a widget for the nodereference field type
  */
@@ -58,9 +48,21 @@ function multiselect_widget_info()
 function multiselect_widget($op, &$node, $field, &$items) {
   switch ($op) {
     case 'prepare form values':
-      $items_transposed = content_transpose_array_rows_cols($items);
-      $items['default nids'] = $items_transposed['nid'];
+      
 
+	  $items_transposed = content_transpose_array_rows_cols($items);
+
+      //to avoid an error being thrown in admin/content/types/<type>/field
+      if(!isset($items_transposed['nid'])){
+        $items_transposed['nid']=array();
+      }
+      $items['default nids'] = $items_transposed['nid'];
+      
+      //remove the null item. 
+      //it was causing a meaningless entry 
+      //(node with nid 0) to be in the selected list.
+      $items['default nids'] = array_diff( $items['default nids'], array(0));
+      
       break;
 
     case 'form':
@@ -81,7 +83,9 @@ function multiselect_widget($op, &$node, $field, &$items) {
       foreach ($options as $key => $value) {
         $options[$key] = _nodereference_item($field, $value, FALSE);
       }
-
+      
+      
+      $selected_options = array();
       //If there already exists referenced nodes for this field, add them
       // to the selected options array (by order of their delta)
       if (is_array($items['default nids']))
@@ -104,6 +108,7 @@ function multiselect_widget($op, &$node, $field, &$items) {
          //create the containing form item
       $form[$field['field_name']] = array(
         '#type'=>'fieldset',
+        '#description' => t($field['widget']['description']),
         '#title'=>t($field['widget']['label']),
         '#tree' => TRUE,
         '#attributes' => array('class'=>'multiselect'),
@@ -121,6 +126,8 @@ function multiselect_widget($op, &$node, $field, &$items) {
         '#size' => 10,
         '#multiple' => TRUE,
       );
+      
+      
       
       //the list of items currently not selected
       $form[$field['field_name']]['unselected'] = array(
@@ -145,7 +152,10 @@ function multiselect_widget($op, &$node, $field, &$items) {
       $form[$field['field_name']]['select'] = array(
         '#type' => 'markup',
         '#submit'=> false,
-        '#value' => '<span class="select"><img  src="'.$module_base_path.'/images/add.png" '.
+        '#value' => 
+          '<span class="select">
+            <img alt="'.t('select').'" 
+                 src="'.base_path().$module_base_path.'/images/add.png" '.
           "onclick='moveSelectedOptions( \"$unselected_name\" , \"$selected_name\" )' /></span>",
         '#weight' => 1,
         '#attributes' => array('class' => 'select'),
@@ -154,8 +164,12 @@ function multiselect_widget($op, &$node, $field, &$items) {
       $form[$field['field_name']]['deselect'] = array(
         '#type' => 'markup',
         '#submit'=> false,
-        '#value' => '<span class="deselect"><img src="'.$module_base_path.'/images/remove.png"'.
-          "onclick='moveSelectedOptions( \"$selected_name\" , \"$unselected_name\" )' /></span>",
+        '#value' => 
+          '<span class="deselect">
+            <img alt="'.t('deselect').'" 
+                 src="'.base_path().$module_base_path.'/images/remove.png"'.
+            "onclick='moveSelectedOptions( \"$selected_name\" , \"$unselected_name\" )' />
+          </span>",
         '#weight' => 2,
       );
       return $form;
@@ -207,10 +221,12 @@ function multiselect_fix_selected($field, $edit)
     $field['selected']['#options'] =  array();
     $field['unselected']['#options'] =  $field['#all_options'];
     
-    foreach( $selected as $selected_nid )
-    {
-      $field['selected']['#options'][$selected_nid] = $field['#all_options'][$selected_nid];
-      unset($field['unselected']['#options'][$selected_nid]);
+    if ( !is_null($selected) ){
+      foreach( $selected as $selected_nid )
+      {
+        $field['selected']['#options'][$selected_nid] = $field['#all_options'][$selected_nid];
+        unset($field['unselected']['#options'][$selected_nid]);
+      }
     }
   }
   
@@ -235,4 +251,3 @@ function multiselect_nodeapi(&$node, $op, $teaser, $page)
   }*/
 }
 
-?>
