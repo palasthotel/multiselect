@@ -1,74 +1,120 @@
-// $Id $
+// $Id$
 
-//@file
-//Code that operates multiselect boxes
-
-$(document).ready(function()
- {
-  //note: Doesn't matter what sort of submit button it is really (preview or submit)
-  //selects all the items in the selected box (so they are actually selected) when submitted
-  $('input.form-submit').click(function()
-  {
-    $('fieldset.multiselect select[@name$="[selected][]"]').selectAll();
-  });
-
-});
-
-//selects all the items in the select box it is called from.
-//usage $('nameofselectbox').selectAll();
-//
-jQuery.fn.selectAll = function()
-{
-  this.each(function()
-  {
-    for (var i=0;i<this.options.length;i++)
-    {
-      option = this.options[i];
-      option.selected = true;
-    }
-  });
-}
-
-
-// -------------------------------------------------------------------
-// hasOptions(obj)
-//  Utility function to determine if an object has an options array
-// -------------------------------------------------------------------
-function hasOptions(obj) {
-  if (obj!=null && obj.options!=null) { 
-    return true; 
-  }
-  else {
-    return false;
-  }
-}
-
-function moveSelectedOptions(from_name,to_name) {
-
-  from = document.getElementsByName(from_name)[0];
-  to = document.getElementsByName(to_name)[0];
-
-  // Move them over
-  if (!hasOptions(from)) { 
-    return false; 
-  }
-
-  for (var i=0; i<from.options.length; i++) {
-    var o = from.options[i];
-    if (o.selected) {
-      if (!hasOptions(to)) { var index = 0; } else { var index=to.options.length; }
-      to.options[index] = new Option( o.text, o.value, false, false);
-      }
-    }
+/**
+ * The JavaScript behavior that goes with the Multiselect form element.
+ */
+(function ($) {
+  Drupal.behaviors.multiselect = {
+    attach: function(context) {
+      // Remove the items that haven't been selected from the select box.
+      $('select.multiselect_unsel:not(.multiselect-processed)', context).addClass('multiselect-processed').each(function() {
+        unselclass = '.' + this.id + '_unsel';
+        selclass = '.' + this.id + '_sel';
+        $(unselclass).removeContentsFrom($(selclass));   
+      });
   
-  // Delete them from original
-  for (var i=(from.options.length-1); i>=0; i--) {
-    var o = from.options[i];
-    if (o.selected) {
-      from.options[i] = null;
+      // Note: Doesn't matter what sort of submit button it is really (preview or submit)
+      // Selects all the items in the selected box (so they are actually selected) when submitted
+      $('input.form-submit:not(.multiselect-processed)', context).addClass('multiselect-processed').click(function() {
+        $('select.multiselect_sel').selectAll();
+      });
+  
+      // Moves selection if it's double clicked to selected box
+      $('select.multiselect_unsel:not(.multiselect-unsel-processed)', context).addClass('multiselect-unsel-processed').dblclick(function() {
+        unselclass = '.' + this.id + '_unsel';
+        selclass = '.' + this.id + '_sel';
+        $(unselclass).moveSelectionTo($(selclass));
+      });
+  
+      // Moves selection if it's double clicked to unselected box
+      $('select.multiselect_sel:not(.multiselect-sel-processed)', context).addClass('multiselect-sel-processed').dblclick(function() {
+        unselclass = '.' + this.id + '_unsel';
+        selclass = '.' + this.id + '_sel';
+        $(selclass).moveSelectionTo($(unselclass));
+      });
+  
+      // Moves selection if add is clicked to selected box
+      $('li.multiselect_add:not(.multiselect-add-processed)', context).addClass('multiselect-add-processed').click(function() {
+        unselclass = '.' + this.id + '_unsel';
+        selclass = '.' + this.id + '_sel';
+        $(unselclass).moveSelectionTo($(selclass));
+      });
+  
+      // Moves selection if remove is clicked to selected box
+      $('li.multiselect_remove:not(.multiselect-remove-processed)', context).addClass('multiselect-remove-processed').click(function() {
+        unselclass = '.' + this.id + '_unsel';
+        selclass = '.' + this.id + '_sel';
+        $(selclass).moveSelectionTo($(unselclass));
+      });
+    }
+  };
+})(jQuery);
+
+// Selects all the items in the select box it is called from.
+// usage $('nameofselectbox').selectAll();
+jQuery.fn.selectAll = function() {
+  this.each(function() {
+    for (var x=0;x<this.options.length;x++) {
+      option = this.options[x];
+      option.selected = true;   
+    }
+  });
+}
+
+// Removes the content of this select box from the target
+// usage $('nameofselectbox').removeContentsFrom(target_selectbox)
+jQuery.fn.removeContentsFrom = function() {
+  dest = arguments[0];
+  this.each(function() {
+    for (var x=this.options.length-1;x>=0;x--) {
+      dest.removeOption(this.options[x].value);
+    }
+  });
+}
+
+// Moves the selection to the select box specified
+// usage $('nameofselectbox').moveSelectionTo(destination_selectbox)
+jQuery.fn.moveSelectionTo = function() {
+  dest = arguments[0];
+  this.each(function() {
+    for (var x=0; x < this.options.length; x++) {
+      option = this.options[x];
+      if (option.selected) {
+        dest.addOption(option);
+        this.remove(x);
+        //$(this).triggerHandler('option-removed', option);
+        x--; // Move x back one so that we'll successfully check again to see if it's selected.
       }
     }
-    
-  from.selectedIndex = -1;
-  to.selectedIndex = -1;
+  });
+}
+
+// Adds an option to a select box
+// usage $('nameofselectbox').addOption(optiontoadd);
+jQuery.fn.addOption = function() {
+  option = arguments[0];
+  this.each(function() {
+    //had to alter code to this to make it work in IE
+    anOption = document.createElement('option');
+    anOption.text = option.text;
+    anOption.value = option.value;
+    this.options[this.options.length] = anOption;
+    //$(this).triggerHandler('option-added', anOption);
+    return false;
+  });
+}
+
+// Removes an option from a select box
+// usage $('nameofselectbox').removeOption(valueOfOptionToRemove);
+jQuery.fn.removeOption = function() {
+  targOption = arguments[0];
+  this.each(function() {
+    for (var x=this.options.length-1;x>=0;x--) {
+      option = this.options[x];
+      if (option.value==targOption) {
+        this.remove(x);
+        //$(this).triggerHandler('option-removed', option);
+      }
+    }
+  });
 }

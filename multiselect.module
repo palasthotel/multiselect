@@ -1,253 +1,296 @@
 <?php
-// $Id $
+// $Id$
 
 /**
  * @file
- * Allows users to select multiple items in an easier way than the normal node-reference widget
- *
- * @author Obslogic (Mike Smith aka Lionfish)
+ * Allows users to select multiple items in an easier way than the normal node-reference widget.
  */
 
 
 /**
- * Implementation of hook_help
+ * Implements hook_help().
  */
-
-function multiselect_help($section='') 
-{
+function multiselect_help($path, $arg) {
   $output = '';
-  switch ($section)
-  {
-    case "admin/help#multiselect":
-      $output = '<p>'.t("Provides an easy to use control for adding multiple items.").'</p>';
+  switch ($path) {
+    case 'admin/help#multiselect':
+      $output = '<p>' . t('Provides a CCK widget for editing fields that allows users to select from a list of options in a left box and have them visually moved into the right box when options are chosen.') . '</p>';
       break;
   }
   return $output;
 }
 
 /**
- * Implementation of hook_widget_info.
- * Specifies the label and that it is a widget for the nodereference field type
+ * Implements hook_form_alter().
  */
+function multiselect_form_alter(&$form, &$form_state, $form_id) {
+  // Provide additional help for the field settings form.
+  switch ($form_id) {
+    case 'field_ui_field_edit_form':
+      if (isset($form['instance']['widget'])) {
+        $widget_type = $form['instance']['widget']['type']['#value'];
+        $field_type = $form['#field']['type'];
+        $label = $form['instance']['label']['#default_value'];
+    
+        if (in_array($widget_type, array('multiselect'))) {
+          if (in_array($field_type, array('list', 'list_number', 'list_text', 'text', 'number_integer', 'number_float', 'number_decimal'))) {
+            //$form['field']['allowed_values_fieldset']['#collapsed'] = FALSE;
+    
+            // If no 'allowed values' were set yet, add a reminder in the messages area.
+            if (empty($form['field']['settings']['allowed_values']['#default_value'])) {
+              drupal_set_message(t("You need to specify the 'allowed values' for this field."), 'warning');
+            }
+          }
+        }
+      }
+      break;
+    default:
+      //dsm($form);
+      break;
+  }
+}
 
-function multiselect_widget_info()
-{
+/**
+ * Implement hook_field_widget_info().
+ */
+function multiselect_field_widget_info() {
   return array(
-    'multiselect_select' => array(
-      'label' => t('Multiselect List'),
-      'field types' => array('nodereference'),
+    'multiselect' => array(
+      'label' => t('Multiselect'),
+      'field types' => array('list_text'),
+      'behaviors' => array(
+        'multiple values' => FIELD_BEHAVIOR_CUSTOM,
+        'default value' => FIELD_BEHAVIOR_DEFAULT,
+      ),
     ),
   );
 }
 
-
 /**
- * Implementation of hook_widget
- * @todo Doesn't seem to populate list when in 'preview' (see http://drupal.org/node/139595)
+ * Implements hook_element_info().
+ *
+ * Any FAPI callbacks needed for individual widgets can be declared here,
+ * and the element will be passed to those callbacks for processing.
  */
-function multiselect_widget($op, &$node, $field, &$items) {
-  switch ($op) {
-    case 'prepare form values':
-      
-
-	  $items_transposed = content_transpose_array_rows_cols($items);
-
-      //to avoid an error being thrown in admin/content/types/<type>/field
-      if(!isset($items_transposed['nid'])){
-        $items_transposed['nid']=array();
-      }
-      $items['default nids'] = $items_transposed['nid'];
-      
-      //remove the null item. 
-      //it was causing a meaningless entry 
-      //(node with nid 0) to be in the selected list.
-      $items['default nids'] = array_diff( $items['default nids'], array(0));
-      
-      break;
-
-    case 'form':
-      
-      $module_base_path = drupal_get_path('module','multiselect');
-      
-      //inserts javascript
-      drupal_add_js($module_base_path . '/multiselect.js');
-        
-      //insert CSS (based on http://www.lullabot.com/articles/how_to_properly_add_css_files)
-      //FALSE means it doesn't aggregate: as it's not used much
-      //TODO: good decision?
-      drupal_add_css($module_base_path . '/multiselect.css','module','all',FALSE); 
-      $form = array();
-
-      $options = _nodereference_potential_references($field, TRUE);
-      
-      foreach ($options as $key => $value) {
-        $options[$key] = _nodereference_item($field, $value, FALSE);
-      }
-      
-      
-      $selected_options = array();
-      //If there already exists referenced nodes for this field, add them
-      // to the selected options array (by order of their delta)
-      if (is_array($items['default nids']))
-      {
-        foreach($items['default nids'] as $delta => $nid)
-        {
-          $selected_options[$nid] = $options[$nid];
-        }
-      }
-      
-      //anything in $alloptions but not in $selectedoptions is "not selected"
-      $not_selected_options = array_diff($options,$selected_options);
-
-      //reassign $options to reflect delta. 
-      //note: No new options are created in this list,
-      //but putting selected options first ensures the form is populated in
-      //the order of (thus maintaining) its deltas.
-      $options = $selected_options + $not_selected_options;
-      
-         //create the containing form item
-      $form[$field['field_name']] = array(
-        '#type'=>'fieldset',
-        '#description' => t($field['widget']['description']),
-        '#title'=>t($field['widget']['label']),
-        '#tree' => TRUE,
-        '#attributes' => array('class'=>'multiselect'),
-        '#all_options' => $options,
-        '#after_build' => array('multiselect_fix_selected'),
-      );
-      
-      //the list of items currently selected
-      $form[$field['field_name']]['selected'] = array(
-        '#title' => t("selected"),
-        '#attributes' => array('class' => "container-inline selected multiselect", 'id' => $field['field_name']),
-        '#type' => 'select',
-        '#weight' => 3,
-        '#options' => $selected_options,
-        '#size' => 10,
-        '#multiple' => TRUE,
-      );
-      
-      
-      
-      //the list of items currently not selected
-      $form[$field['field_name']]['unselected'] = array(
-        '#title' => t("unselected"),
-        '#attributes' => array('class' => "container-inline unselected multiselect", 'id' => $field['field_name']),
-        '#type' => 'select',
-        '#weight' => 0,
-        '#options' => $not_selected_options,
-        '#size' => 10,
-        '#multiple' => TRUE,
-      );
-      
-      /*
-      * The buttons to (de)select objects are implemented as field markup
-      * with an associated javascript function onclick
-      */
-      
-      //name attribute of the associated select elements
-      $selected_name = $field['field_name'].'[selected][]';
-      $unselected_name = $field['field_name'].'[unselected][]';
-      
-      $form[$field['field_name']]['select'] = array(
-        '#type' => 'markup',
-        '#submit'=> false,
-        '#value' => 
-          '<span class="select">
-            <img alt="'.t('select').'" 
-                 src="'.base_path().$module_base_path.'/images/add.png" '.
-          "onclick='moveSelectedOptions( \"$unselected_name\" , \"$selected_name\" )' /></span>",
-        '#weight' => 1,
-        '#attributes' => array('class' => 'select'),
-      );
-      
-      $form[$field['field_name']]['deselect'] = array(
-        '#type' => 'markup',
-        '#submit'=> false,
-        '#value' => 
-          '<span class="deselect">
-            <img alt="'.t('deselect').'" 
-                 src="'.base_path().$module_base_path.'/images/remove.png"'.
-            "onclick='moveSelectedOptions( \"$selected_name\" , \"$unselected_name\" )' />
-          </span>",
-        '#weight' => 2,
-      );
-      return $form;
-
-    case 'process form values':
-      if ($field['multiple']) {
-
-        //adjust perspective
-        $items['nids'] = $items['selected'];
-        unset($items['selected']);
-        unset($items['unselected']);
-        
-        // if nothing selected, make it 'none'
-        if (empty($items['nids'])) {
-          $items['nids'] = array(0 => '0');
-        }
-
-        $items = array_values(content_transpose_array_rows_cols(array('nid' => $items['nids'])));
-      }
-      else {
-        $items[0]['nid'] = $items['nids'];
-      }
-      // Remove the widget's data representation so it isn't saved.
-      //  unset($items['nids']);
-      foreach ($items as $delta => $item) {
-        $items[$delta]['error_field'] =  $field['field_name'] .'][nids';
-      }
-      
-    case 'validate':
-
-  }
-
+/*
+function multiselect_element_info() {
+  return array(
+    'multiselect' => array(
+      '#process' => array('multiselect_process'),
+    ),
+  );
 }
-
+*/
 
 /**
- * Alters the preview form to include the newly added items
+ * Process an individual element.
+ *
+ * Build the form element. When creating a form using FAPI #process,
+ * note that $element['#value'] is already set.
+ *
+ * The $fields array is in $form['#field_info'][$element['#field_name']].
  */
-function multiselect_fix_selected($field, $edit)
-{
+//function multiselect_process($element, &$form_state, $complete_form) {
+//  drupal_set_message('element:');
+//  dsm($element);
+//  drupal_set_message('form state:');
+//  dsm($form_state);
+//  drupal_set_message('complete form:');
+//  dsm($complete_form);
+/**
+ * Implements hook_field_widget_form().
+ * Build the form widget using Form API (as much as possible).
+ */
+function multiselect_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+  /* START copy from options.module */
+  // Abstract over the actual field columns, to allow different field types to
+  // reuse those widgets.
+  $value_key = key($field['columns']);
+
+  $type = str_replace('options_', '', $instance['widget']['type']);
+  //$multiple = $field['cardinality'] > 1 || $field['cardinality'] == FIELD_CARDINALITY_UNLIMITED;
+  $multiple = $field['cardinality'];
+  $required = $element['#required'];
+  $properties = _options_properties($type, $multiple, $required);
+
+  // Prepare the list of options.
+  $options = _options_get_options($field, $instance, $properties);
+
+  // Put current field values in shape.
+  $default_value = _options_storage_to_form($items, $options, $value_key, $properties);
+  /* END copy from options.module */
   
-  if( isset($field['#post']) && !empty($field['#post'])){
+  // Insert Javascript and CSS for this widget.
+  $path = drupal_get_path('module', 'multiselect');
+  drupal_add_js($path . '/multiselect.js');
+  drupal_add_css($path . '/multiselect.css');
+
+  /*$field_name = $element['#field_name'];
+  $field = $form['#field_info'][$field_name];
+  $field_key  = $element['#columns'][0];*/
   
-    $field_id = $field['selected']['#attributes']['id'];
-    
-    
-    $selected = $field['selected']['#post'][$field_id]['selected'];
-    
-    $field['selected']['#options'] =  array();
-    $field['unselected']['#options'] =  $field['#all_options'];
-    
-    if ( !is_null($selected) ){
-      foreach( $selected as $selected_nid )
-      {
-        $field['selected']['#options'][$selected_nid] = $field['#all_options'][$selected_nid];
-        unset($field['unselected']['#options'][$selected_nid]);
-      }
+  // Prepare the list of options.
+  $options = _options_get_options($field, $instance, $properties);
+
+  // For this specific widget, HTML should be filtered out and entities left unencoded.
+  // See content_allowed_values / content_filter_xss / filter_xss.
+  _multiselect_allowed_values_filter_html($options);
+
+  // Create some arrays for use later in the function.
+  $unselected_options = array();
+  $selected_options = array();
+  // Add selected items to the array first
+  if (is_array($items)) {
+    foreach ($items as $key => $value) {
+      //$selected_options[$value] = _multiselect_allowed_values_filter_html($value);
+      $selected_options[$value['value']] = $value['value'];
     }
   }
-  
-  return $field;
+  // Add the remaining options to the arrays
+  foreach ($options as $key => $value) {
+    if (!isset($selected_options[$key])) {
+      drupal_set_message('key = '.$key);
+      $unselected_options[$key] = $value;
+      //$selected_options[$key] = $value;
+    }
+  }
+
+  // Set up useful variables.
+  $addbutton = $element['#field_name'] . "_add";
+  $removebutton = $element['#field_name'] . "_remove";
+  $selfield = $element['#field_name'] . "_sel";
+  $unselfield = $element['#field_name'] . "_unsel";
+
+  // Call methods to create prefix. (ie the non-selected table, etc)
+  $prefix_pre = '<div class="form-item multiselect"><label for="edit-title">' . t($element['#title']) . ':';
+  if ($required) {
+    $prefix_pre .= '<span class="form-required" title="' . t('This field is required.') . '"> * </span>';
+  }
+  $prefix_pre .= "</label>\n";
+  $prefix_pre .= "<div id=\"multiselect_labels\"><div id=\"label_unselected\">" . t('Available Options') . ":</div>\n";
+  $prefix_pre .= "<div id=\"label_selected\">" . t('Selected Options') . ":</div>\n</div>\n";
+  $prefix_pre .= "<div id=\"multiselect_available\">";
+  $prefix_pre .= _multiselect_html_for_unselected_box_start($unselfield, $element['#field_name']);
+  $prefix_options = _multiselect_html_for_unselected_box_options($unselected_options);
+  $prefix_post = "</select>\n</div>\n";
+  $prefix_post .= _html_for_buttons($element['#field_name']);
+
+  // Build the basic select box using Form API.
+  $element += array(
+    '#type' => 'select',
+    '#title' => $element['#title'],
+    '#description' => $element['#description'],
+    '#required' => $required,
+    '#multiple' => $multiple,
+    //'#options' => $options,
+    '#options' => $selected_options,
+    '#size' => 10,
+    '#prefix' => $prefix_pre . $prefix_options . $prefix_post,
+    '#suffix' => "\n</div>\n",
+    '#attributes' => array('class' => array("$selfield multiselect_sel"), 'id' => array($element['#field_name'])),
+    '#default_value' => $default_value,
+    '#post_render' => array('_mm_cleanup'),
+  );
+  return $element;
 }
 
-
-
-
-
+function _mm_cleanup($content, $elements) {
+  //drupal_set_message('elements:');
+  //dsm($elements);
+  return $content;
+}
 
 /**
- * Implementation of hook_nodeapi.
- * @todo The adding of javascript can be moved to the _widget function.
+ * Implements hook_field_widget_form().
+ * Build the form widget using Form API (as much as possible).
  */
+/*
+function multiselect_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+  switch ($instance['widget']['type']) {
+    case 'multiselect':
+      $element = array(
+        '#type' => 'multiselect',
+        '#default_value' => $items,
+      );
+      break;
+  }
+  return $element;
+}
+*/
 
-function multiselect_nodeapi(&$node, $op, $teaser, $page)
-{
-/*  switch ($op)
-  {
-    case 'prepare': 
-  }*/
+/**
+ * Implements hook_theme().
+ */
+/*
+function multiselect_theme() {
+  return array(
+    'multiselect' => array(
+      'arguments' => array('element' => NULL),
+    ),
+  );
+}
+*/
+
+/**
+ * FAPI theme for an individual elements.
+ *
+ * The textfield or select is already rendered by the
+ * textfield or select themes and the html output
+ * lives in $element['#children']. Override this theme to
+ * make custom changes to the output.
+ *
+ * $element['#field_name'] contains the field name
+ * $element['#delta]  is the position of this element in the group
+ */
+/*
+function theme_multiselect($element) {
+  return $element['#children'];
+}
+*/
+
+/**
+ * Copied from D6 CCK content module. Not sure where this went in D7.
+ * Filter out HTML from allowed values array while leaving entities unencoded.
+ *
+ * @see content_allowed_values()
+ * @see optionwidgets_select_process()
+ * @see content_handler_filter_many_to_one::allowed_values()
+ */
+function _multiselect_allowed_values_filter_html(&$options) {
+  foreach ($options as $key => $opt) {
+    if (is_array($opt)) {
+      _multiselect_allowed_values_filter_html($options[$key]);
+    }
+    else {
+      $options[$key] = html_entity_decode(strip_tags($opt), ENT_QUOTES);
+    }
+  }
 }
 
+/**
+ * Provides html to draw the "not selected" box
+ */
+function _multiselect_html_for_unselected_box_start($unselfield, $fieldname) {
+  $boxhtml = '';
+  $boxhtml .= "<select name=\"" . $unselfield . "\" multiple=\"multiple\" class=\"form-select " . $unselfield . " multiselect_unsel\" id=\"" . $fieldname . "\" size=\"10\">\n";
+  return $boxhtml;
+}
+
+function _multiselect_html_for_unselected_box_options($unselected_options) {
+  $boxhtml = '';
+  foreach ($unselected_options as $value => $name) {
+    $boxhtml .= "<option value=\"" . $value . "\">" . $name . "</option>\n";
+  }
+  return $boxhtml;
+}
+
+/**
+ * Provides html to display the buttons on the form.
+ */
+function _html_for_buttons($fieldname) {
+  $buttons_code = "<ul id=\"multiselect_btns\">
+<li class=\"multiselect_add\" id=\"" . $fieldname . "\"><a href=\"javascript:;\">Add</a></li>
+<li class=\"multiselect_remove\" id=\"" . $fieldname . "\"><a href=\"javascript:;\">Remove</a></li>
+</ul>";
+  return $buttons_code;
+}

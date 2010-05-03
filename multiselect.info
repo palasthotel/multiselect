@@ -1,5 +1,8 @@
-; $Id $
+; $Id$
 name = Multiselect
-description = "Defines multiple selection field type, to allow easier multi-selection for users."
-dependencies = content
+description = Defines a CCK multiple selection field widget, to allow easier multi-selection for users.
 package = CCK
+core = "7.x"
+version = "7.x-1.x-dev"
+
+files[] = multiselect.module
