@@ -57,10 +57,10 @@ function multiselect_field_widget_info() {
   return array(
     'multiselect' => array(
       'label' => t('Multiselect'),
-      'field types' => array('list_text'),
+      'field types' => array('list', 'list_text', 'list_number'),
       'behaviors' => array(
         'multiple values' => FIELD_BEHAVIOR_CUSTOM,
-        'default value' => FIELD_BEHAVIOR_DEFAULT,
+        'default value' => FIELD_BEHAVIOR_CUSTOM,
       ),
     ),
   );
@@ -82,21 +82,6 @@ function multiselect_element_info() {
 }
 */
 
-/**
- * Process an individual element.
- *
- * Build the form element. When creating a form using FAPI #process,
- * note that $element['#value'] is already set.
- *
- * The $fields array is in $form['#field_info'][$element['#field_name']].
- */
-//function multiselect_process($element, &$form_state, $complete_form) {
-//  drupal_set_message('element:');
-//  dsm($element);
-//  drupal_set_message('form state:');
-//  dsm($form_state);
-//  drupal_set_message('complete form:');
-//  dsm($complete_form);
 /**
  * Implements hook_field_widget_form().
  * Build the form widget using Form API (as much as possible).
@@ -125,20 +110,13 @@ function multiselect_field_widget_form(&$form, &$form_state, $field, $instance, 
   drupal_add_js($path . '/multiselect.js');
   drupal_add_css($path . '/multiselect.css');
 
-  /*$field_name = $element['#field_name'];
-  $field = $form['#field_info'][$field_name];
-  $field_key  = $element['#columns'][0];*/
-  
-  // Prepare the list of options.
-  $options = _options_get_options($field, $instance, $properties);
-
   // For this specific widget, HTML should be filtered out and entities left unencoded.
   // See content_allowed_values / content_filter_xss / filter_xss.
   _multiselect_allowed_values_filter_html($options);
 
   // Create some arrays for use later in the function.
-  $unselected_options = array();
   $selected_options = array();
+  $unselected_options = array();
   // Add selected items to the array first
   if (is_array($items)) {
     foreach ($items as $key => $value) {
@@ -149,7 +127,6 @@ function multiselect_field_widget_form(&$form, &$form_state, $field, $instance, 
   // Add the remaining options to the arrays
   foreach ($options as $key => $value) {
     if (!isset($selected_options[$key])) {
-      drupal_set_message('key = '.$key);
       $unselected_options[$key] = $value;
       //$selected_options[$key] = $value;
     }
@@ -182,15 +159,19 @@ function multiselect_field_widget_form(&$form, &$form_state, $field, $instance, 
     '#description' => $element['#description'],
     '#required' => $required,
     '#multiple' => $multiple,
-    //'#options' => $options,
-    '#options' => $selected_options,
+    '#options' => $options,
+    //'#options' => $selected_options,
     '#size' => 10,
     '#prefix' => $prefix_pre . $prefix_options . $prefix_post,
     '#suffix' => "\n</div>\n",
     '#attributes' => array('class' => array("$selfield multiselect_sel"), 'id' => array($element['#field_name'])),
     '#default_value' => $default_value,
-    '#post_render' => array('_mm_cleanup'),
+    //'#post_render' => array('_mm_cleanup'),
+    '#value_key' => $value_key,
+    '#element_validate' => array('options_field_widget_validate'),
+    '#properties' => $properties,
   );
+
   return $element;
 }
 
