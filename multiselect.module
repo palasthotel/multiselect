@@ -33,7 +33,7 @@ function multiselect_form_alter(&$form, &$form_state, $form_id) {
         $label = $form['instance']['label']['#default_value'];
     
         if (in_array($widget_type, array('multiselect'))) {
-          if (in_array($field_type, array('list', 'list_number', 'list_text', 'text', 'number_integer', 'number_float', 'number_decimal'))) {
+          if (in_array($field_type, array('list', 'list_number', 'list_text', 'taxonomy_term_reference'))) {
             //$form['field']['allowed_values_fieldset']['#collapsed'] = FALSE;
     
             // If no 'allowed values' were set yet, add a reminder in the messages area.
@@ -57,7 +57,7 @@ function multiselect_field_widget_info() {
   return array(
     'multiselect' => array(
       'label' => t('Multiselect'),
-      'field types' => array('list', 'list_text', 'list_number'),
+      'field types' => array('list', 'list_text', 'list_number', 'taxonomy_term_reference'),
       'behaviors' => array(
         'multiple values' => FIELD_BEHAVIOR_CUSTOM,
         'default value' => FIELD_BEHAVIOR_CUSTOM,
@@ -96,7 +96,8 @@ function multiselect_field_widget_form(&$form, &$form_state, $field, $instance, 
   //$multiple = $field['cardinality'] > 1 || $field['cardinality'] == FIELD_CARDINALITY_UNLIMITED;
   $multiple = $field['cardinality'];
   $required = $element['#required'];
-  $properties = _options_properties($type, $multiple, $required);
+  $has_value = isset($items[0][$value_key]);
+  $properties = _options_properties($type, $multiple, $required, $has_value);
 
   // Prepare the list of options.
   $options = _options_get_options($field, $instance, $properties);
@@ -118,6 +119,7 @@ function multiselect_field_widget_form(&$form, &$form_state, $field, $instance, 
   $selected_options = array();
   $unselected_options = array();
   // Add selected items to the array first
+  // TODO: still need to get this working with field type 'taxonomy_term_reference'.
   if (is_array($items)) {
     foreach ($items as $key => $value) {
       //$selected_options[$value] = _multiselect_allowed_values_filter_html($value);
