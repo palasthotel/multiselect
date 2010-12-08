@@ -20,6 +20,7 @@ select.multiselect_sel {
 /* FIELDS */
 #multiselect_available {
 	float: left;
+	width: 250px; /* Fix for IE8 - http://drupal.org/node/990806 */
 }
 /* BUTTONS */
 ul#multiselect_btns {
