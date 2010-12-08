@@ -146,9 +146,9 @@ function multiselect_field_widget_form(&$form, &$form_state, $field, $instance, 
     $prefix_pre .= '<span class="form-required" title="' . t('This field is required.') . '"> * </span>';
   }
   $prefix_pre .= "</label>\n";
-  $prefix_pre .= "<div id=\"multiselect_labels\"><div id=\"label_unselected\">" . t('Available Options') . ":</div>\n";
-  $prefix_pre .= "<div id=\"label_selected\">" . t('Selected Options') . ":</div>\n</div>\n";
-  $prefix_pre .= "<div id=\"multiselect_available\">";
+  $prefix_pre .= "<div id=\"multiselect_labels" . "_" . $element['#field_name'] . "\" class=\"multiselect_labels\"><div id=\"label_unselected" . "_" . $element['#field_name'] . "\" class=\"label_unselected\">" . t('Available Options') . ":</div>\n";
+  $prefix_pre .= "<div id=\"label_selected" . "_" . $element['#field_name'] . "\" class=\"label_selected\">" . t('Selected Options') .":</div>\n</div>\n";
+  $prefix_pre .= "<div id=\"multiselect_available" . "_" . $element['#field_name'] . "\" class=\"multiselect_available\">";
   $prefix_pre .= _multiselect_html_for_unselected_box_start($unselfield, $element['#field_name']);
   $prefix_options = _multiselect_html_for_unselected_box_options($unselected_options);
   $prefix_post = "</select>\n</div>\n";
@@ -271,7 +271,7 @@ function _multiselect_html_for_unselected_box_options($unselected_options) {
  * Provides html to display the buttons on the form.
  */
 function _html_for_buttons($fieldname) {
-  $buttons_code = "<ul id=\"multiselect_btns\">
+  $buttons_code = "<ul id=\"multiselect_btns" . "_" . $fieldname . "\" class=\"multiselect_btns\">
 <li class=\"multiselect_add\" id=\"" . $fieldname . "\"><a href=\"javascript:;\">Add</a></li>
 <li class=\"multiselect_remove\" id=\"" . $fieldname . "\"><a href=\"javascript:;\">Remove</a></li>
 </ul>";
