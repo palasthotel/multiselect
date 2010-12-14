@@ -31,11 +31,11 @@ function multiselect_form_alter(&$form, &$form_state, $form_id) {
         $widget_type = $form['instance']['widget']['type']['#value'];
         $field_type = $form['#field']['type'];
         $label = $form['instance']['label']['#default_value'];
-    
+
         if (in_array($widget_type, array('multiselect'))) {
           if (in_array($field_type, array('list', 'list_number', 'list_text', 'taxonomy_term_reference'))) {
             //$form['field']['allowed_values_fieldset']['#collapsed'] = FALSE;
-    
+
             // If no 'allowed values' were set yet, add a reminder in the messages area.
             if (empty($form['field']['settings']['allowed_values']['#default_value'])) {
               drupal_set_message(t("You need to specify the 'allowed values' for this field."), 'warning');
@@ -105,7 +105,7 @@ function multiselect_field_widget_form(&$form, &$form_state, $field, $instance, 
   // Put current field values in shape.
   $default_value = _options_storage_to_form($items, $options, $value_key, $properties);
   /* END copy from options.module */
-  
+
   // Insert Javascript and CSS for this widget.
   $path = drupal_get_path('module', 'multiselect');
   drupal_add_js($path . '/multiselect.js');
@@ -147,7 +147,7 @@ function multiselect_field_widget_form(&$form, &$form_state, $field, $instance, 
   }
   $prefix_pre .= "</label>\n";
   $prefix_pre .= "<div id=\"multiselect_labels" . "_" . $element['#field_name'] . "\" class=\"multiselect_labels\"><div id=\"label_unselected" . "_" . $element['#field_name'] . "\" class=\"label_unselected\">" . t('Available Options') . ":</div>\n";
-  $prefix_pre .= "<div id=\"label_selected" . "_" . $element['#field_name'] . "\" class=\"label_selected\">" . t('Selected Options') .":</div>\n</div>\n";
+  $prefix_pre .= "<div id=\"label_selected" . "_" . $element['#field_name'] . "\" class=\"label_selected\">" . t('Selected Options') . ":</div>\n</div>\n";
   $prefix_pre .= "<div id=\"multiselect_available" . "_" . $element['#field_name'] . "\" class=\"multiselect_available\">";
   $prefix_pre .= _multiselect_html_for_unselected_box_start($unselfield, $element['#field_name']);
   $prefix_options = _multiselect_html_for_unselected_box_options($unselected_options);
@@ -181,6 +181,18 @@ function _mm_cleanup($content, $elements) {
   //drupal_set_message('elements:');
   //dsm($elements);
   return $content;
+}
+
+
+/**
+ * Implements hook_field_error().
+ */
+function multiselect_field_widget_error($element, $error) {
+  switch ($error['error']) {
+    case 'field_cardinality':
+      form_error($element, $error['message']);
+      break;
+  }
 }
 
 /**
