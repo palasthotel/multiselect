@@ -1,0 +1,8 @@
+; $Id$
+name = Multiselect FAPI Example
+description = Example usage of the Multiselect module via Form API calls.
+package = Example modules
+core = "7.x"
+version = VERSION
+
+files[] = multiselect_fapi_example.module

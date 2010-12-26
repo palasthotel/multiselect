@@ -3,6 +3,6 @@ name = Multiselect
 description = Defines a CCK multiple selection field widget, to allow easier multi-selection for users.
 package = CCK
 core = "7.x"
-version = "7.x-1.x-dev"
+version = VERSION
 
 files[] = multiselect.module

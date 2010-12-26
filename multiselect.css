@@ -64,6 +64,6 @@ li.multiselect_add {
 	clear: both;
 }
 /* Hide the original label placement. */
-.multiselect .form-item label {
+.multiselect .form-item label, .form-type-multiselect .form-item label {
   display: none;
 }

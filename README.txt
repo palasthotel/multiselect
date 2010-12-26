@@ -1,9 +1,12 @@
+// $Id $
+
 Description
 -------
-The Multiselect module defines a CCK multiple selection field widget, to allow easier multi-selection for users.
+The Multiselect module defines a CCK and Form API multiple selection field widget, to allow easier
+multi-selection for users.
 
-Multiselect was redesigned for Drupal 6 and 7 by Mark W. Jarrell (attheshow) at
-Austin Peay State University (http://www.apsu.edu).
+Multiselect was by Mark W. Jarrell (attheshow) at
+Fleet Thought (http://fleetthought.com).
 
 Install
 -------
