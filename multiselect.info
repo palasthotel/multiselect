@@ -1,4 +1,3 @@
-; $Id$
 name = Multiselect
 description = Defines a CCK multiple selection field widget, to allow easier multi-selection for users.
 package = CCK

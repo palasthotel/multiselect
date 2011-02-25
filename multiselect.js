@@ -1,4 +1,3 @@
-// $Id$
 
 /**
  * The JavaScript behavior that goes with the Multiselect form element.
