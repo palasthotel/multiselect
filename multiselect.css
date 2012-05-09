@@ -22,6 +22,21 @@ select.multiselect_sel {
 	float: left;
 	width: 250px; /* Fix for IE8 - http://drupal.org/node/990806 */
 }
+.form-disabled select.form-multiselect {
+  background-color: #eee;
+  color: #777;
+}
+select.form-multiselect {
+  padding: 2px;
+  border: 1px solid #ccc;
+  border-top-color: #999;
+  background: #fff;
+  color: #333;
+}
+select.form-multiselect:focus {
+  color: #000;
+  border-color: #ace;
+}
 /* BUTTONS */
 ul.multiselect_btns {
   list-style: none;
