@@ -84,7 +84,7 @@ function multiselect_field_widget_form(&$form, &$form_state, $field, $instance, 
   $properties = _options_properties($type, $multiple, $required, $has_value);
 
   // Prepare the list of options.
-  $options = _options_get_options($field, $instance, $properties);
+  $options = _options_get_options($field, $instance, $properties, NULL, NULL);
 
   // Put current field values in shape.
   $default_value = _options_storage_to_form($items, $options, $value_key, $properties);
