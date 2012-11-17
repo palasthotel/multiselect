@@ -111,6 +111,13 @@ function multiselect_field_widget_form(&$form, &$form_state, $field, $instance, 
     '#properties' => $properties,
   );
 
+   // Attach CSS and Javascript for this widget.
+   $module_path = drupal_get_path('module', 'multiselect');
+   $element['#attached'] = array(
+     'css' => array($module_path . '/multiselect.css'),
+     'js' => array($module_path . '/multiselect.js'),
+   );
+
   return $element;
 }
 
@@ -156,11 +163,6 @@ function _multiselect_html_for_box_options($options) {
  * return $widget = an array of html items and values for use in the final presentation of widget.
  */
 function _multiselect_build_widget_code($options, $items, $element, $required = FALSE) {
-  // Insert Javascript and CSS for this widget.
-  $path = drupal_get_path('module', 'multiselect');
-  drupal_add_js($path . '/multiselect.js');
-  drupal_add_css($path . '/multiselect.css');
-
   // For this specific widget, HTML should be filtered out and entities left unencoded.
   // See content_allowed_values / content_filter_xss / filter_xss.
   _multiselect_allowed_values_filter_html($options);
