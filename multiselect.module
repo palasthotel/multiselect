@@ -92,9 +92,6 @@ function multiselect_field_widget_form(&$form, &$form_state, $field, $instance, 
 
   $widget = _multiselect_build_widget_code($options, $items, $element, $required);
 
-  // Remove html from options values
-  _multiselect_allowed_values_filter_html($options);
-
   // Build the basic select box using Form API.
   $element += array(
     '#type' => 'select',
