@@ -109,6 +109,7 @@ function multiselect_field_widget_form(&$form, &$form_state, $field, $instance, 
     '#value_key' => $value_key,
     '#element_validate' => array('options_field_widget_validate'),
     '#properties' => $properties,
+    '#after_build' => array('_multiselect_after_build'),
   );
 
    // Attach CSS and Javascript for this widget.
@@ -118,6 +119,24 @@ function multiselect_field_widget_form(&$form, &$form_state, $field, $instance, 
      'js' => array($module_path . '/multiselect.js'),
    );
 
+  return $element;
+}
+
+/**
+ * After_build callback for this widget.
+ */
+function _multiselect_after_build($element, $form_state) {
+  $value_key = $element['#columns'][0];
+  $items = array();
+
+  if (isset($form_state['values'][$element['#field_name']][LANGUAGE_NONE])) {
+    foreach ($form_state['values'][$element['#field_name']][LANGUAGE_NONE] as $nid) {
+      $items[] = array($value_key => $nid);
+    }
+  }
+
+  $widget = _multiselect_build_widget_code($element['#options'], $items, $element, $element['#required']);
+  $element['#prefix'] = $widget['prefix_pre'] . $widget['prefix_options'] . $widget['prefix_post'];
   return $element;
 }
 
