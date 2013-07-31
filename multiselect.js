@@ -6,11 +6,27 @@
   Drupal.behaviors.multiselect = {
     attach: function(context) {
       // Remove the items that haven't been selected from the select box.
+      // $('select.multiselect_unsel:not(.multiselect-processed)', context).addClass('multiselect-processed').each(function() {
+      //   unselclass = '.' + this.id + '_unsel';
+      //   selclass = '.' + this.id + '_sel';
+      //   $(unselclass).removeContentsFrom($(selclass));   
+      // });
       $('select.multiselect_unsel:not(.multiselect-processed)', context).addClass('multiselect-processed').each(function() {
         unselclass = '.' + this.id + '_unsel';
         selclass = '.' + this.id + '_sel';
-        $(unselclass).removeContentsFrom($(selclass));   
+        var options=$(selclass)[0].options;
+        for(var x=options.length-1;x>=0;x--)
+        {
+          var option=options[x];
+          if($(option).attr('selected')==false)
+          {
+            $(option).detach();
+          }
+        }
+        
       });
+
+
   
       // Note: Doesn't matter what sort of submit button it is really (preview or submit)
       // Selects all the items in the selected box (so they are actually selected) when submitted
